@@ -4,6 +4,7 @@ import type {
   CropMatchScore,
   FertilityStatus,
   FertilizerPrescription,
+  Language,
   SoilHealthReport,
   TelemetryPayload,
 } from "../types";
@@ -68,7 +69,9 @@ function deficit(tested: number, target: [number, number]): number {
 
 export function calculateFertilizer(
   sample: TelemetryPayload,
-  crop: CropBenchmark
+  crop: CropBenchmark,
+  rainProbability: number = 0,
+  lang: Language = "en"
 ): FertilizerPrescription {
   const nitrogenDeficit = deficit(sample.nitrogen, crop.targetN);
   const phosphorusDeficit = deficit(sample.phosphorus, crop.targetP);
@@ -94,14 +97,40 @@ export function calculateFertilizer(
     dapKgPerAcre,
     mopKgPerAcre,
     adjustedUreaKgPerAcre,
-    irrigationAdvice: irrigationTrigger(sample.moisture),
+    irrigationAdvice: irrigationTrigger(sample.moisture, rainProbability, lang),
   };
 }
 
-export function irrigationTrigger(moisture: number): string {
-  if (moisture < 35) return "Immediate irrigation required (35–45 mm).";
-  if (moisture <= 65) return "Optimal moisture profile. No immediate irrigation needed.";
-  return "High moisture / waterlogged. Hold irrigation, ensure drainage.";
+export function irrigationTrigger(
+  moisture: number,
+  rainProbability: number = 0,
+  lang: Language = "en"
+): string {
+  // Scenario 1: Already high moisture / waterlogged
+  if (moisture > 65) {
+    return lang === "hi"
+      ? "अत्यधिक नमी / जलभराव। सिंचाई रोकें और जल निकासी सुनिश्चित करें।"
+      : "High moisture / waterlogged. Hold irrigation, ensure drainage.";
+  }
+
+  // Scenario 2: Soil is dry, BUT imminent rain is predicted (> 60%)
+  if (moisture < 35 && rainProbability >= 60) {
+    return lang === "hi"
+      ? `मृदा शुष्क है, लेकिन 24 घंटे में बारिश (${rainProbability}%) की संभावना है। जलभराव रोकने हेतु सिंचाई स्थगित करें।`
+      : `Soil is dry, but rain is likely within 24h (${rainProbability}% chance). Delay irrigation to prevent waterlogging.`;
+  }
+
+  // Scenario 3: Soil is dry and no significant rain is expected
+  if (moisture < 35) {
+    return lang === "hi"
+      ? "तत्काल सिंचाई आवश्यक है (35–45 मिमी)।"
+      : "Immediate irrigation required (35–45 mm).";
+  }
+
+  // Scenario 4: Optimal moisture range (35% - 65%)
+  return lang === "hi"
+    ? "अनुकूल नमी स्तर। तत्काल सिंचाई की आवश्यकता नहीं है।"
+    : "Optimal moisture profile. No immediate irrigation needed.";
 }
 
 export function fertilityStatus(topScore: number): FertilityStatus {
@@ -110,14 +139,18 @@ export function fertilityStatus(topScore: number): FertilityStatus {
   return "deficient";
 }
 
-export function buildSoilHealthReport(sample: TelemetryPayload): SoilHealthReport {
+export function buildSoilHealthReport(
+  sample: TelemetryPayload,
+  rainProbability: number = 0,
+  lang: Language = "en"
+): SoilHealthReport {
   const topCrops = rankCrops(sample, 5);
   const bestCrop = topCrops[0].crop;
   return {
     sample,
     fertilityStatus: fertilityStatus(topCrops[0].score),
     topCrops,
-    fertilizer: calculateFertilizer(sample, bestCrop),
+    fertilizer: calculateFertilizer(sample, bestCrop, rainProbability, lang),
   };
 }
 

@@ -69,10 +69,12 @@ function App() {
     [selectedSample]
   );
 
+  const nextDayRain = weather?.[0]?.precipitationProbability ?? 0;
+
   const fertilizer = useMemo(() => {
     if (!selectedSample || !selectedCropMatch) return null;
-    return calculateFertilizer(selectedSample, selectedCropMatch.crop);
-  }, [selectedSample, selectedCropMatch]);
+    return calculateFertilizer(selectedSample, selectedCropMatch.crop, nextDayRain, lang);
+  }, [selectedSample, selectedCropMatch, nextDayRain, lang]);
 
   const report = useMemo(() => {
     if (!selectedSample || !fertilizer || topCrops.length === 0) return null;
@@ -94,7 +96,7 @@ function App() {
     if (!report) return;
     setExportingPdf(true);
     try {
-      await generateSoilHealthCardPDF(session, report, null, lang, areaUnit);
+      await generateSoilHealthCardPDF(session, report, null, lang, areaUnit, weather);
     } finally {
       setExportingPdf(false);
     }
@@ -187,7 +189,11 @@ function App() {
           </Panel>
 
           <Panel eyebrow={t("commercialDosage")} title={t("fertilizerPrescription")}>
-            <FertilizerPlan plan={fertilizer} moisture={selectedSample?.moisture} />
+            <FertilizerPlan
+              plan={fertilizer}
+              moisture={selectedSample?.moisture}
+              rainProbability={nextDayRain}
+            />
           </Panel>
 
           <Panel eyebrow={t("openMeteo")} title={t("sevenDayForecast")}>

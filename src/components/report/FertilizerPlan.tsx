@@ -6,9 +6,11 @@ import { irrigationAdviceText } from "../../lib/i18n";
 export function FertilizerPlan({
   plan,
   moisture,
+  rainProbability = 0,
 }: {
   plan: FertilizerPrescription | null;
   moisture?: number;
+  rainProbability?: number;
 }) {
   const { lang, t } = useLanguage();
 
@@ -22,7 +24,10 @@ export function FertilizerPlan({
     { label: "MOP", value: plan.mopKgPerAcre, note: `${t("kDeficit")} ${plan.potassiumDeficit} kg/ac` },
   ];
 
-  const irrigationText = moisture !== undefined ? irrigationAdviceText(moisture, lang) : plan.irrigationAdvice;
+  const irrigationText =
+    moisture !== undefined
+      ? irrigationAdviceText(moisture, lang, rainProbability)
+      : plan.irrigationAdvice;
 
   return (
     <div className="space-y-3">

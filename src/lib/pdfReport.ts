@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { AdvisoryResult, AreaUnit, FieldSurveySession, Language, SoilHealthReport } from "../types";
+import type { AdvisoryResult, AreaUnit, FieldSurveySession, Language, SoilHealthReport, WeatherForecastDay } from "../types";
 import { cropName, irrigationAdviceText, translateSeason } from "./i18n";
 import { classifySoilZone } from "./soilClassification";
 import { centroid } from "./geo";
@@ -46,7 +46,8 @@ function buildEnglishPdf(
   session: FieldSurveySession,
   report: SoilHealthReport,
   advisory: AdvisoryResult | null,
-  areaUnit: AreaUnit
+  areaUnit: AreaUnit,
+  rainProbability: number = 0
 ): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   let y = MARGIN;
@@ -139,7 +140,7 @@ function buildEnglishPdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   const irrigationLines = doc.splitTextToSize(
-    `Irrigation advice: ${irrigationAdviceText(report.sample.moisture, "en")}`,
+    `Irrigation advice: ${irrigationAdviceText(report.sample.moisture, "en", rainProbability)}`,
     CONTENT_WIDTH
   );
   doc.text(irrigationLines, MARGIN, y);
@@ -192,7 +193,8 @@ async function buildHindiPdf(
   session: FieldSurveySession,
   report: SoilHealthReport,
   advisory: AdvisoryResult | null,
-  areaUnit: AreaUnit
+  areaUnit: AreaUnit,
+  rainProbability: number = 0
 ): Promise<jsPDF> {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   let y = MARGIN;
@@ -235,7 +237,7 @@ async function buildHindiPdf(
     { text: `यूरिया: ${report.fertilizer.adjustedUreaKgPerAcre} किग्रा/एकड़ (N की कमी: ${report.fertilizer.nitrogenDeficit} किग्रा/एकड़)`, fontSizePx: 10 },
     { text: `DAP: ${report.fertilizer.dapKgPerAcre} किग्रा/एकड़ (P की कमी: ${report.fertilizer.phosphorusDeficit} किग्रा/एकड़)`, fontSizePx: 10 },
     { text: `MOP: ${report.fertilizer.mopKgPerAcre} किग्रा/एकड़ (K की कमी: ${report.fertilizer.potassiumDeficit} किग्रा/एकड़)`, fontSizePx: 10 },
-    { text: `सिंचाई सलाह: ${irrigationAdviceText(report.sample.moisture, "hi")}`, fontSizePx: 10 },
+    { text: `सिंचाई सलाह: ${irrigationAdviceText(report.sample.moisture, "hi", rainProbability)}`, fontSizePx: 10 },
   ]);
 
   if (advisory) {
@@ -280,12 +282,14 @@ export async function generateSoilHealthCardPDF(
   report: SoilHealthReport,
   advisory: AdvisoryResult | null,
   lang: Language = "en",
-  areaUnit: AreaUnit = "acre"
+  areaUnit: AreaUnit = "acre",
+  weather?: WeatherForecastDay[] | null
 ): Promise<void> {
+  const rainProbability = weather?.[0]?.precipitationProbability ?? 0;
   const doc =
     lang === "hi"
-      ? await buildHindiPdf(session, report, advisory, areaUnit)
-      : buildEnglishPdf(session, report, advisory, areaUnit);
+      ? await buildHindiPdf(session, report, advisory, areaUnit, rainProbability)
+      : buildEnglishPdf(session, report, advisory, areaUnit, rainProbability);
 
   const suffix = lang === "hi" ? "मृदा-स्वास्थ्य-कार्ड" : "soil-health-card";
   doc.save(`${suffix}_${session.fieldName.replace(/\s+/g, "-")}_sample-${report.sample.sampleIndex}.pdf`);

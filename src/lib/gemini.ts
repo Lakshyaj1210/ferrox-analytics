@@ -10,6 +10,7 @@ function endpoint(apiKey: string) {
 function buildPrompt(report: SoilHealthReport, weather: WeatherForecastDay[] | null, lang: Language): string {
   const { sample, topCrops, fertilizer, fertilityStatus } = report;
   const best = topCrops[0];
+  const nextDayRain = weather?.[0]?.precipitationProbability ?? 0;
   const weatherLine = weather
     ? `7-day outlook: ${weather
         .slice(0, 3)
@@ -35,7 +36,7 @@ Sample point #${sample.sampleIndex} at (${sample.lat}, ${sample.lng}):
 
 Best-fit crop: ${cropName(best.crop, "en")} (suitability score ${best.score}/100)
 Fertilizer plan: Urea ${fertilizer.adjustedUreaKgPerAcre} kg/acre, DAP ${fertilizer.dapKgPerAcre} kg/acre, MOP ${fertilizer.mopKgPerAcre} kg/acre
-Irrigation advice: ${irrigationAdviceText(sample.moisture, "en")}
+Irrigation advice: ${irrigationAdviceText(sample.moisture, "en", nextDayRain)}
 ${weatherLine}
 
 Write 4-6 short sentences: (1) how the soil looks right now, (2) the recommended crop and why,
@@ -51,11 +52,13 @@ export function offlineAdvisoryTemplate(
 ): string {
   const { sample, topCrops, fertilizer, fertilityStatus } = report;
   const best = topCrops[0];
-  const irrigation = irrigationAdviceText(sample.moisture, lang);
+  const nextDayRain = weather?.[0]?.precipitationProbability ?? 0;
+  const irrigation = irrigationAdviceText(sample.moisture, lang, nextDayRain);
+  const rainAlreadyMentioned = sample.moisture < 35 && nextDayRain >= 60;
   const statusHi: Record<string, string> = { optimal: "उपजाऊ", moderate: "उपयोगी", deficient: "अवक्षीण" };
 
   if (lang === "hi") {
-    const rainNote = weather?.[0]
+    const rainNote = (weather?.[0] && !rainAlreadyMentioned)
       ? ` अगले एक दिन में ${weather[0].precipitationProbability}% बारिश की संभावना है, कृपया उसी अनुसार सिंचाई का समय तय करें।`
       : "";
     return (
@@ -67,7 +70,7 @@ export function offlineAdvisoryTemplate(
     );
   }
 
-  const rainNote = weather?.[0]
+  const rainNote = (weather?.[0] && !rainAlreadyMentioned)
     ? ` The forecast shows a ${weather[0].precipitationProbability}% chance of rain in the next day, so time your irrigation accordingly.`
     : "";
   return (

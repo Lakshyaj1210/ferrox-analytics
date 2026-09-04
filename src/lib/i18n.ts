@@ -1,4 +1,5 @@
 import type { Language } from "../types";
+import { irrigationTrigger } from "./agronomy";
 
 type Dict = Record<string, { en: string; hi: string }>;
 
@@ -238,10 +239,12 @@ export function translateWeatherCode(code: number, lang: Language): string {
 }
 
 /** Irrigation advice, bilingual, matching the deterministic threshold rules. */
-export function irrigationAdviceText(moisture: number, lang: Language): string {
-  if (moisture < 35) return t("irrigationLow", lang);
-  if (moisture <= 65) return t("irrigationOptimal", lang);
-  return t("irrigationHigh", lang);
+export function irrigationAdviceText(
+  moisture: number,
+  lang: Language,
+  rainProbability: number = 0
+): string {
+  return irrigationTrigger(moisture, rainProbability, lang);
 }
 
 /** Crop name in the requested language, falling back to English. */
